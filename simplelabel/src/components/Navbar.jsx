@@ -1,8 +1,14 @@
 import React from 'react';
-import { Tag, Shield, GitCompare, Database, Sparkles } from 'lucide-react';
+import { Tag, Shield, GitCompare, User, LogOut, Database } from 'lucide-react';
 import { isSupabaseConfigured } from '../lib/supabase';
 
-export default function Navbar({ activeTab, setActiveTab, onOpenConfig }) {
+export default function Navbar({ 
+  currentUser, 
+  activeTab, 
+  setActiveTab, 
+  onLogout, 
+  onOpenConfig 
+}) {
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -15,69 +21,77 @@ export default function Navbar({ activeTab, setActiveTab, onOpenConfig }) {
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-lg text-slate-900 tracking-tight">SimpleLabel</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  MVP
-                </span>
+                {currentUser?.role === 'admin' ? (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                    Admin
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Anggota
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 hidden sm:block">Anotasi Manual & Benchmark LLM</p>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center space-x-1 sm:space-x-2">
-            <button
-              onClick={() => setActiveTab('labeling')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'labeling'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Tag className="w-4 h-4" />
-              <span>Labeling (Anggota)</span>
-            </button>
+          {/* Navigation for Admin */}
+          {currentUser?.role === 'admin' && (
+            <nav className="flex items-center space-x-2">
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  activeTab === 'admin'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Admin Panel</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('compare')}
+                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  activeTab === 'compare'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <GitCompare className="w-4 h-4" />
+                <span>Compare Labels</span>
+              </button>
+            </nav>
+          )}
+
+          {/* Right Section: Member Profile or Logout */}
+          <div className="flex items-center space-x-3">
+            {/* Database settings button if needed */}
+            {!isSupabaseConfigured && (
+              <button
+                onClick={onOpenConfig}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition flex items-center space-x-1"
+                title="Atur Supabase"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Set Anon Key</span>
+              </button>
+            )}
+
+            {currentUser?.role === 'member' && (
+              <div className="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                <User className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-800">{currentUser.name}</span>
+              </div>
+            )}
 
             <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'admin'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
+              onClick={onLogout}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200 transition"
+              title="Keluar / Ganti Akun"
             >
-              <Shield className="w-4 h-4" />
-              <span>Admin Panel</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('compare')}
-              className={`flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'compare'
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <GitCompare className="w-4 h-4" />
-              <span>Compare Labels</span>
-            </button>
-          </nav>
-
-          {/* Connection Status Badge & Button */}
-          <div className="flex items-center">
-            <button
-              onClick={onOpenConfig}
-              title="Klik untuk konfigurasi database Supabase"
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                isSupabaseConfigured
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-purple-500'}`} />
-              <Database className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">
-                {isSupabaseConfigured ? 'Supabase Live' : 'Mode Demo / Lokal'}
-              </span>
+              <LogOut className="w-4 h-4 text-slate-400 group-hover:text-red-500" />
+              <span>{currentUser?.role === 'admin' ? 'Keluar Admin' : 'Ganti Nama'}</span>
             </button>
           </div>
         </div>

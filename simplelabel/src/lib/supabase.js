@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const envUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oqigkuywngvhzrisjkuo.supabase.co';
 const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const localUrl = localStorage.getItem('simplelabel_supabase_url') || '';
@@ -12,8 +12,7 @@ export const SUPABASE_ANON_KEY = localKey || envKey;
 export const isSupabaseConfigured = Boolean(
   SUPABASE_URL && 
   SUPABASE_ANON_KEY && 
-  SUPABASE_URL.startsWith('http') && 
-  !SUPABASE_URL.includes('your-project')
+  SUPABASE_URL.startsWith('http')
 );
 
 export const supabase = isSupabaseConfigured 

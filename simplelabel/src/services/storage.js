@@ -1,127 +1,68 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import Papa from 'papaparse';
 
-// Local storage keys for fallback/mock mode
-const LS_MEMBERS_KEY = 'simplelabel_local_members';
-const LS_ASSIGNMENTS_KEY = 'simplelabel_local_assignments';
-const LS_LLM_KEY = 'simplelabel_local_llm_results';
-
-// Initial default names for quick testing
-const DEFAULT_INITIAL_MEMBERS = [
-  { id: '1', name: 'Rajendra', created_at: new Date().toISOString() },
-  { id: '2', name: 'Anggota 2', created_at: new Date().toISOString() },
-  { id: '3', name: 'Anggota 3', created_at: new Date().toISOString() },
-  { id: '4', name: 'Anggota 4', created_at: new Date().toISOString() },
-  { id: '5', name: 'Anggota 5', created_at: new Date().toISOString() },
-  { id: '6', name: 'Anggota 6', created_at: new Date().toISOString() },
-];
-
-function getLocalData(key, fallback = []) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    console.error('Failed to parse local storage for', key, e);
-    return fallback;
-  }
-}
-
-function setLocalData(key, data) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error('Failed to write local storage for', key, e);
+function ensureSupabase() {
+  if (!supabase || !isSupabaseConfigured) {
+    throw new Error('Database Supabase belum terhubung. Pastikan VITE_SUPABASE_ANON_KEY sudah diisi.');
   }
 }
 
 // ============================================================================
-// MEMBERS SERVICE (Name-based)
+// MEMBERS SERVICE
 // ============================================================================
 export async function getMembers() {
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('members')
-      .select('*')
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return data || [];
-  } else {
-    let members = getLocalData(LS_MEMBERS_KEY, null);
-    if (!members) {
-      members = DEFAULT_INITIAL_MEMBERS;
-      setLocalData(LS_MEMBERS_KEY, members);
-    }
-    return members;
-  }
+  ensureSupabase();
+  const { data, error } = await supabase
+    .from('members')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
 export async function addMember(name) {
+  ensureSupabase();
   const cleanName = name.trim();
   if (!cleanName) throw new Error('Nama anggota tidak boleh kosong');
 
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('members')
-      .insert([{ name: cleanName }])
-      .select()
-      .single();
-    if (error) {
-      if (error.code === '23505') throw new Error(`Nama "${cleanName}" sudah terdaftar!`);
-      throw error;
-    }
-    return data;
-  } else {
-    const members = getLocalData(LS_MEMBERS_KEY, DEFAULT_INITIAL_MEMBERS);
-    if (members.some(m => m.name.toLowerCase() === cleanName.toLowerCase())) {
-      throw new Error(`Nama "${cleanName}" sudah terdaftar!`);
-    }
-    const newMember = {
-      id: 'mem_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      name: cleanName,
-      created_at: new Date().toISOString(),
-    };
-    members.push(newMember);
-    setLocalData(LS_MEMBERS_KEY, members);
-    return newMember;
+  const { data, error } = await supabase
+    .from('members')
+    .insert([{ name: cleanName }])
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') throw new Error(`Nama "${cleanName}" sudah terdaftar!`);
+    throw error;
   }
+  return data;
 }
 
 export async function deleteMember(id) {
-  if (isSupabaseConfigured) {
-    const { error } = await supabase
-      .from('members')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  } else {
-    const members = getLocalData(LS_MEMBERS_KEY, DEFAULT_INITIAL_MEMBERS);
-    const filtered = members.filter(m => m.id !== id);
-    setLocalData(LS_MEMBERS_KEY, filtered);
-  }
+  ensureSupabase();
+  const { error } = await supabase
+    .from('members')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ============================================================================
 // ASSIGNMENTS & DATA DISTRIBUTION
 // ============================================================================
 export async function getAssignments(filterName = null) {
-  if (isSupabaseConfigured) {
-    let query = supabase.from('assignments').select('*').order('created_at', { ascending: true });
-    if (filterName) {
-      query = query.eq('member_name', filterName);
-    }
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  } else {
-    const assignments = getLocalData(LS_ASSIGNMENTS_KEY, []);
-    if (filterName) {
-      return assignments.filter(a => a.member_name === filterName);
-    }
-    return assignments;
+  ensureSupabase();
+  let query = supabase.from('assignments').select('*').order('created_at', { ascending: true });
+  if (filterName) {
+    query = query.eq('member_name', filterName);
   }
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
 }
 
 export async function distributeDataset(rawRows, recordIdCol, textCol, membersList) {
+  ensureSupabase();
   if (!membersList || membersList.length === 0) {
     throw new Error('Tidak ada anggota yang terdaftar untuk menerima distribusi data.');
   }
@@ -139,14 +80,12 @@ export async function distributeDataset(rawRows, recordIdCol, textCol, membersLi
 
   for (let m = 0; m < numMembers; m++) {
     const member = membersList[m];
-    // Members with index < remainder get baseCount + 1, ensuring max difference <= 1
     const countForMember = baseCount + (m < remainder ? 1 : 0);
 
     for (let i = 0; i < countForMember; i++) {
       if (currentIndex >= totalRows) break;
       const row = rawRows[currentIndex];
       
-      // Clean and stable record_id
       let recordId = row[recordIdCol];
       if (recordId === undefined || recordId === null || String(recordId).trim() === '') {
         recordId = `rec_${currentIndex + 1}`;
@@ -171,21 +110,19 @@ export async function distributeDataset(rawRows, recordIdCol, textCol, membersLi
     }
   }
 
-  if (isSupabaseConfigured) {
-    // Clear old assignments first
-    const { error: delError } = await supabase.from('assignments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delError) console.warn('Note on deleting old assignments:', delError);
+  // Clear old assignments first
+  const { error: delError } = await supabase
+    .from('assignments')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  if (delError) console.warn('Note deleting assignments:', delError);
 
-    // Insert in batches of 300 to avoid payload limits
-    const batchSize = 300;
-    for (let i = 0; i < assignmentsToInsert.length; i += batchSize) {
-      const batch = assignmentsToInsert.slice(i, i + batchSize);
-      const { error: insError } = await supabase.from('assignments').insert(batch);
-      if (insError) throw insError;
-    }
-  } else {
-    // LocalStorage
-    setLocalData(LS_ASSIGNMENTS_KEY, assignmentsToInsert);
+  // Insert in batches of 300 to avoid payload limits
+  const batchSize = 300;
+  for (let i = 0; i < assignmentsToInsert.length; i += batchSize) {
+    const batch = assignmentsToInsert.slice(i, i + batchSize);
+    const { error: insError } = await supabase.from('assignments').insert(batch);
+    if (insError) throw insError;
   }
 
   return {
@@ -199,6 +136,7 @@ export async function distributeDataset(rawRows, recordIdCol, textCol, membersLi
 }
 
 export async function updateManualLabel(recordId, label) {
+  ensureSupabase();
   const normalizedLabel = label.toUpperCase();
   if (normalizedLabel !== 'POSITIVE' && normalizedLabel !== 'NEGATIVE') {
     throw new Error('Label harus POSITIVE atau NEGATIVE');
@@ -206,27 +144,18 @@ export async function updateManualLabel(recordId, label) {
 
   const nowIso = new Date().toISOString();
 
-  if (isSupabaseConfigured) {
-    const { error } = await supabase
-      .from('assignments')
-      .update({
-        manual_label: normalizedLabel,
-        labeled_at: nowIso,
-      })
-      .eq('record_id', recordId);
-    if (error) throw error;
-  } else {
-    const assignments = getLocalData(LS_ASSIGNMENTS_KEY, []);
-    const idx = assignments.findIndex(a => a.record_id === recordId);
-    if (idx !== -1) {
-      assignments[idx].manual_label = normalizedLabel;
-      assignments[idx].labeled_at = nowIso;
-      setLocalData(LS_ASSIGNMENTS_KEY, assignments);
-    }
-  }
+  const { error } = await supabase
+    .from('assignments')
+    .update({
+      manual_label: normalizedLabel,
+      labeled_at: nowIso,
+    })
+    .eq('record_id', recordId);
+  if (error) throw error;
 }
 
 export async function getMonitoringStats() {
+  ensureSupabase();
   const members = await getMembers();
   const assignments = await getAssignments();
 
@@ -260,6 +189,7 @@ export async function getMonitoringStats() {
 }
 
 export async function exportManualCsv() {
+  ensureSupabase();
   const assignments = await getAssignments();
   const rows = assignments.map(a => ({
     record_id: a.record_id,
@@ -277,6 +207,7 @@ export async function exportManualCsv() {
 // LLM RESULTS & COMPARISON
 // ============================================================================
 export async function importLlmResults(rawRows, recordIdCol, labelCol) {
+  ensureSupabase();
   const assignments = await getAssignments();
   const existingRecordIds = new Set(assignments.map(a => String(a.record_id).trim()));
 
@@ -293,7 +224,6 @@ export async function importLlmResults(rawRows, recordIdCol, labelCol) {
     const rawLabel = row[labelCol];
     if (!rawLabel) continue;
 
-    // Normalize label (handles 'positif', 'positive', 'negatif', 'negative', etc.)
     const lower = String(rawLabel).trim().toLowerCase();
     let normLabel = null;
     if (lower.startsWith('pos') || lower === '1') {
@@ -319,18 +249,18 @@ export async function importLlmResults(rawRows, recordIdCol, labelCol) {
     });
   }
 
-  if (isSupabaseConfigured) {
-    const { error: delError } = await supabase.from('llm_results').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (delError) console.warn('Note deleting old LLM results:', delError);
+  // Clear old LLM results and insert
+  const { error: delError } = await supabase
+    .from('llm_results')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  if (delError) console.warn('Note deleting old LLM results:', delError);
 
-    const batchSize = 300;
-    for (let i = 0; i < validLlmResults.length; i += batchSize) {
-      const batch = validLlmResults.slice(i, i + batchSize);
-      const { error: insError } = await supabase.from('llm_results').insert(batch);
-      if (insError) throw insError;
-    }
-  } else {
-    setLocalData(LS_LLM_KEY, validLlmResults);
+  const batchSize = 300;
+  for (let i = 0; i < validLlmResults.length; i += batchSize) {
+    const batch = validLlmResults.slice(i, i + batchSize);
+    const { error: insError } = await supabase.from('llm_results').insert(batch);
+    if (insError) throw insError;
   }
 
   return {
@@ -342,19 +272,13 @@ export async function importLlmResults(rawRows, recordIdCol, labelCol) {
 }
 
 export async function getComparisonData() {
+  ensureSupabase();
   const assignments = await getAssignments();
-  let llmResults = [];
-
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase.from('llm_results').select('*');
-    if (error) throw error;
-    llmResults = data || [];
-  } else {
-    llmResults = getLocalData(LS_LLM_KEY, []);
-  }
+  const { data: llmResults, error } = await supabase.from('llm_results').select('*');
+  if (error) throw error;
 
   const llmMap = new Map();
-  for (const item of llmResults) {
+  for (const item of (llmResults || [])) {
     llmMap.set(String(item.record_id).trim(), item.llm_label);
   }
 

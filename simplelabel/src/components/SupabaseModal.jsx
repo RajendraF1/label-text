@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Database, Check, AlertCircle, Key, RefreshCw } from 'lucide-react';
+import { X, Database, Check, AlertCircle, Key } from 'lucide-react';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured, saveSupabaseConfig, resetSupabaseConfig } from '../lib/supabase';
 
 export default function SupabaseModal({ isOpen, onClose }) {
@@ -18,10 +18,6 @@ export default function SupabaseModal({ isOpen, onClose }) {
     saveSupabaseConfig(url, key);
   };
 
-  const handleResetToLocal = () => {
-    resetSupabaseConfig();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden">
@@ -33,7 +29,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Koneksi Database Supabase</h3>
-              <p className="text-xs text-slate-500">Kelola endpoint database cloud atau mode demo lokal</p>
+              <p className="text-xs text-slate-500">Konfigurasi endpoint dan Anon Public Key</p>
             </div>
           </div>
           <button
@@ -54,44 +50,39 @@ export default function SupabaseModal({ isOpen, onClose }) {
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
               <p className="font-semibold">
-                Status Saat Ini: {isSupabaseConfigured ? 'Terhubung ke Supabase Live' : 'Mode Demo / Lokal (LocalStorage)'}
+                Status: {isSupabaseConfigured ? 'Terhubung ke Supabase' : 'Kunci Anon Key Belum Diisi'}
               </p>
               <p className="mt-0.5 text-slate-600 leading-relaxed">
-                {isSupabaseConfigured
-                  ? 'Semua perubahan tersimpan langsung ke PostgreSQL Supabase cloud Anda.'
-                  : 'Data saat ini disimpan di browser Anda. Masukkan URL & Anon Key Supabase untuk sinkronisasi realtime kelompok.'}
+                Salin Anon Public Key dari dashboard Supabase Anda (Project Settings → API).
               </p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 flex items-center space-x-1">
-              <span>Project URL</span>
-              <span className="text-slate-400 font-normal">(cth: https://xyzcompany.supabase.co)</span>
-            </label>
+            <label className="text-xs font-semibold text-slate-700">Project URL:</label>
             <input
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://your-project-id.supabase.co"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+              placeholder="https://oqigkuywngvhzrisjkuo.supabase.co"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center space-x-1">
               <Key className="w-3.5 h-3.5 text-slate-400" />
-              <span>Anon Public Key</span>
+              <span>Anon Public Key:</span>
             </label>
             <input
               type="password"
               value={key}
               onChange={(e) => setKey(e.target.value)}
               placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-[11px] text-slate-500">
-              *Hanya gunakan Anon Public Key. Jangan pernah memasukkan Service Role Key di sini.
+            <p className="text-[11px] text-slate-400">
+              *Hanya gunakan anon public key, jangan gunakan service role key.
             </p>
           </div>
 
@@ -101,32 +92,21 @@ export default function SupabaseModal({ isOpen, onClose }) {
             </div>
           )}
 
-          <div className="pt-2 flex items-center justify-between">
-            {isSupabaseConfigured && (
-              <button
-                type="button"
-                onClick={handleResetToLocal}
-                className="text-xs text-slate-500 hover:text-red-600 font-medium underline"
-              >
-                Ganti ke Mode Demo Lokal
-              </button>
-            )}
-            <div className="flex items-center space-x-2 ml-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Tutup
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors flex items-center space-x-1.5"
-              >
-                <Check className="w-4 h-4" />
-                <span>Simpan & Hubungkan</span>
-              </button>
-            </div>
+          <div className="pt-2 flex items-center justify-end space-x-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition"
+            >
+              Tutup
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition flex items-center space-x-1.5"
+            >
+              <Check className="w-4 h-4" />
+              <span>Simpan & Hubungkan</span>
+            </button>
           </div>
         </form>
       </div>

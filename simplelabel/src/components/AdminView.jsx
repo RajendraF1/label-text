@@ -7,9 +7,6 @@ import {
   Plus, 
   Trash2, 
   CheckCircle2, 
-  Lock, 
-  KeyRound, 
-  LogOut,
   FileSpreadsheet, 
   ArrowRight,
   RefreshCw,
@@ -25,16 +22,7 @@ import {
   exportManualCsv 
 } from '../services/storage';
 
-const ADMIN_PASSWORD = 'rahasia123';
-
 export default function AdminView() {
-  // Admin Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('simplelabel_admin_authenticated') === 'true';
-  });
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState(null);
-
   const [subTab, setSubTab] = useState('monitoring'); // 'members', 'import', 'monitoring'
 
   // Members State
@@ -57,28 +45,9 @@ export default function AdminView() {
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadMembersData();
-      loadStatsData();
-    }
-  }, [isAuthenticated]);
-
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('simplelabel_admin_authenticated', 'true');
-      setAuthError(null);
-    } else {
-      setAuthError('Password admin salah!');
-    }
-  };
-
-  const handleAdminLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('simplelabel_admin_authenticated');
-    setPasswordInput('');
-  };
+    loadMembersData();
+    loadStatsData();
+  }, []);
 
   async function loadMembersData() {
     try {
@@ -197,73 +166,8 @@ export default function AdminView() {
     }
   };
 
-  // ==========================================================================
-  // IF NOT AUTHENTICATED: SHOW PASSWORD LOCK SCREEN
-  // ==========================================================================
-  if (!isAuthenticated) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-20">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-5 shadow-inner">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <h3 className="text-xl font-bold text-slate-900 mb-1">Akses Admin Dilindungi</h3>
-          <p className="text-xs text-slate-500 mb-6">
-            Masukkan password admin untuk mengelola anggota, distribusi dataset, dan ekspor.
-          </p>
-
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="password"
-                placeholder="Masukkan Password Admin"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                autoFocus
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-              />
-            </div>
-
-            {authError && (
-              <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-200">
-                {authError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition"
-            >
-              Buka Admin Panel
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================================================
-  // AUTHENTICATED ADMIN VIEW
-  // ==========================================================================
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Admin Top Header with Logout */}
-      <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-600">Admin Mode Aktif</span>
-          <h2 className="text-lg font-extrabold text-slate-900">Panel Kontrol Proyek Kelompok</h2>
-        </div>
-        <button
-          onClick={handleAdminLogout}
-          className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold flex items-center space-x-1.5 transition"
-        >
-          <LogOut className="w-4 h-4 text-slate-500" />
-          <span>Keluar Admin</span>
-        </button>
-      </div>
-
       {/* Admin Sub-navigation */}
       <div className="flex border-b border-slate-200 mb-8 space-x-6">
         <button
@@ -595,7 +499,7 @@ export default function AdminView() {
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="font-bold text-slate-900 text-base mb-1">Daftar Anggota Kelompok (Nama)</h3>
             <p className="text-xs text-slate-500 mb-6">
-              Anggota dapat memilih nama mereka di layar pelabelan untuk langsung mengerjakan tugas masing-masing.
+              Anggota dapat memilih nama mereka di layar login untuk langsung mengerjakan tugas masing-masing.
             </p>
 
             {/* Add Member Form */}
@@ -657,7 +561,7 @@ export default function AdminView() {
             <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 flex items-start space-x-2">
               <Info className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
               <span>
-                Nama-nama di atas akan muncul pada dropdown di halaman Labeling agar teman-teman Anda dapat memilih nama mereka sendiri.
+                Nama-nama di atas akan muncul pada dropdown di Portal Anggota agar teman-teman kelompok dapat memilih nama mereka sendiri.
               </span>
             </div>
           </div>

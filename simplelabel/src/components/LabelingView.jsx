@@ -8,13 +8,9 @@ import {
   ThumbsUp, 
   ThumbsDown
 } from 'lucide-react';
-import { getMembers, getAssignments, updateManualLabel } from '../services/storage';
+import { getAssignments, updateManualLabel } from '../services/storage';
 
-export default function LabelingView({ onGoToAdmin }) {
-  const [members, setMembers] = useState([]);
-  const [selectedName, setSelectedName] = useState(() => {
-    return localStorage.getItem('simplelabel_current_member_name') || '';
-  });
+export default function LabelingView({ memberName, onGoToAdmin, onChangeName }) {
   const [tasks, setTasks] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -22,40 +18,11 @@ export default function LabelingView({ onGoToAdmin }) {
   const [feedbackMsg, setFeedbackMsg] = useState(null);
   const [jumpInput, setJumpInput] = useState('');
 
-  // Load members on mount
   useEffect(() => {
-    async function loadMembersList() {
-      try {
-        setLoading(true);
-        const mems = await getMembers();
-        setMembers(mems);
-        if (selectedName && !mems.some(m => m.name === selectedName)) {
-          if (mems.length > 0) {
-            setSelectedName(mems[0].name);
-          } else {
-            setSelectedName('');
-          }
-        } else if (!selectedName && mems.length > 0) {
-          setSelectedName(mems[0].name);
-        }
-      } catch (err) {
-        console.error('Failed to load members:', err);
-      } finally {
-        setLoading(false);
-      }
+    if (memberName) {
+      loadTasksForMember(memberName);
     }
-    loadMembersList();
-  }, []);
-
-  // Save selected name to localStorage and load tasks
-  useEffect(() => {
-    if (selectedName) {
-      localStorage.setItem('simplelabel_current_member_name', selectedName);
-      loadTasksForMember(selectedName);
-    } else {
-      setTasks([]);
-    }
-  }, [selectedName]);
+  }, [memberName]);
 
   async function loadTasksForMember(name) {
     try {
@@ -154,7 +121,7 @@ export default function LabelingView({ onGoToAdmin }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Top Bar: Member Selector & Status */}
+      {/* Top Bar: Member Info & Switch */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
@@ -164,55 +131,44 @@ export default function LabelingView({ onGoToAdmin }) {
             <div className="flex items-center space-x-2">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sedang Anotasi:</span>
               <span className="font-bold text-slate-900 text-sm sm:text-base">
-                {selectedName || 'Belum memilih nama'}
+                {memberName}
               </span>
             </div>
-            <p className="text-xs text-slate-500">Pilih nama Anda untuk melihat tugas pelabelan Anda</p>
+            <p className="text-xs text-slate-500">Tugas pelabelan terisolasi khusus untuk bagian Anda</p>
           </div>
         </div>
 
-        {/* Change Name Dropdown */}
-        <div className="flex items-center space-x-2">
-          <label className="text-xs text-slate-500 font-medium whitespace-nowrap">Pilih Nama Anda:</label>
-          <select
-            value={selectedName}
-            onChange={(e) => setSelectedName(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-800"
-          >
-            {members.length === 0 ? (
-              <option value="">(Belum ada anggota)</option>
-            ) : (
-              members.map(m => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
+        <button
+          onClick={onChangeName}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition"
+        >
+          Ganti Nama / Keluar
+        </button>
       </div>
 
       {/* Main Content Area */}
       {loading ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center shadow-sm">
           <div className="inline-block animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-3" />
-          <p className="text-sm font-medium text-slate-600">Memuat data tugas untuk {selectedName}...</p>
+          <p className="text-sm font-medium text-slate-600">Memuat data tugas untuk {memberName}...</p>
         </div>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Belum Ada Tugas untuk {selectedName}</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Belum Ada Tugas untuk {memberName}</h3>
           <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
             Admin belum mengunggah dataset atau belum mendistribusikan data ke anggota kelompok.
           </p>
-          <button
-            onClick={onGoToAdmin}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition shadow-sm"
-          >
-            Buka Admin Panel untuk Import Dataset
-          </button>
+          {onGoToAdmin && (
+            <button
+              onClick={onGoToAdmin}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition shadow-sm"
+            >
+              Masuk Admin Panel untuk Distribusi Data
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
