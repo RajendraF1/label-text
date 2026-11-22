@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, User, Shield, Lock, KeyRound, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { Tag, User, Shield, Lock, KeyRound, ArrowRight, AlertCircle } from 'lucide-react';
 import { getMembers } from '../services/storage';
 import { isSupabaseConfigured } from '../lib/supabase';
 
+const MEMBER_PASSWORD = 'tugas-ptp-21';
 const ADMIN_PASSWORD = 'rahasia123';
 
 export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupabaseModal }) {
   const [role, setRole] = useState('member'); // 'member' or 'admin'
   const [members, setMembers] = useState([]);
   const [selectedMemberName, setSelectedMemberName] = useState('');
+  const [memberPassword, setMemberPassword] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,10 @@ export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupab
     e.preventDefault();
     if (!selectedMemberName) {
       setAuthError('Pilih nama Anda terlebih dahulu.');
+      return;
+    }
+    if (memberPassword !== MEMBER_PASSWORD) {
+      setAuthError('Password anggota kelompok salah!');
       return;
     }
     setAuthError(null);
@@ -122,10 +128,10 @@ export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupab
           {/* FORM 1: ANGGOTA KELOMPOK */}
           {/* ================================================================ */}
           {role === 'member' && (
-            <form onSubmit={handleMemberSubmit} className="space-y-5">
+            <form onSubmit={handleMemberSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Pilih Nama Anda:
+                  1. Pilih Nama Anda:
                 </label>
                 {loading ? (
                   <div className="p-3 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
@@ -155,6 +161,22 @@ export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupab
                 )}
               </div>
 
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  2. Password Anggota:
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    placeholder="Masukkan password anggota kelompok"
+                    value={memberPassword}
+                    onChange={(e) => setMemberPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+
               {authError && (
                 <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-200">
                   {authError}
@@ -171,7 +193,7 @@ export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupab
               </button>
 
               <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-                Tugas akan otomatis disesuaikan dengan bagian data nama Anda.
+                Tugas akan otomatis disesuaikan dengan paket data nama Anda.
               </p>
             </form>
           )}
@@ -180,7 +202,7 @@ export default function LoginPage({ onLoginAsMember, onLoginAsAdmin, onOpenSupab
           {/* FORM 2: ADMIN */}
           {/* ================================================================ */}
           {role === 'admin' && (
-            <form onSubmit={handleAdminSubmit} className="space-y-5">
+            <form onSubmit={handleAdminSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Password Admin:
