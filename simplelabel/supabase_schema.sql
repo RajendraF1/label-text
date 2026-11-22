@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SimpleLabel MVP - Supabase SQL Schema (Name-based Authentication)
+-- SimpleLabel MVP - Supabase SQL Schema (Fix Permissions & Grants)
 -- Project: https://oqigkuywngvhzrisjkuo.supabase.co
 -- ==============================================================================
 
@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS public.members (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Index for name
 CREATE INDEX IF NOT EXISTS idx_members_name ON public.members(name);
 
 -- 2. Create table: assignments
@@ -25,7 +24,6 @@ CREATE TABLE IF NOT EXISTS public.assignments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Indexing for assignments
 CREATE INDEX IF NOT EXISTS idx_assignments_member_id ON public.assignments(member_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_member_name ON public.assignments(member_name);
 CREATE INDEX IF NOT EXISTS idx_assignments_record_id ON public.assignments(record_id);
@@ -39,8 +37,19 @@ CREATE TABLE IF NOT EXISTS public.llm_results (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Indexing for llm_results
 CREATE INDEX IF NOT EXISTS idx_llm_results_record_id ON public.llm_results(record_id);
+
+-- ==============================================================================
+-- CRUCIAL: GRANT PERMISSIONS TO ANON & AUTHENTICATED ROLES
+-- (Fixes "permission denied for table members")
+-- ==============================================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+GRANT ALL ON TABLE public.members TO anon, authenticated;
+GRANT ALL ON TABLE public.assignments TO anon, authenticated;
+GRANT ALL ON TABLE public.llm_results TO anon, authenticated;
+
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
 -- ==============================================================================
 -- Row Level Security (RLS) & Policies
@@ -56,6 +65,9 @@ CREATE POLICY "Public select members" ON public.members FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Public insert members" ON public.members;
 CREATE POLICY "Public insert members" ON public.members FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public update members" ON public.members;
+CREATE POLICY "Public update members" ON public.members FOR UPDATE USING (true);
 
 DROP POLICY IF EXISTS "Public delete members" ON public.members;
 CREATE POLICY "Public delete members" ON public.members FOR DELETE USING (true);
@@ -79,6 +91,9 @@ CREATE POLICY "Public select llm_results" ON public.llm_results FOR SELECT USING
 
 DROP POLICY IF EXISTS "Public insert llm_results" ON public.llm_results;
 CREATE POLICY "Public insert llm_results" ON public.llm_results FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public update llm_results" ON public.llm_results;
+CREATE POLICY "Public update llm_results" ON public.llm_results FOR UPDATE USING (true);
 
 DROP POLICY IF EXISTS "Public delete llm_results" ON public.llm_results;
 CREATE POLICY "Public delete llm_results" ON public.llm_results FOR DELETE USING (true);
