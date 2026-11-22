@@ -7,23 +7,23 @@ import {
   Plus, 
   Trash2, 
   CheckCircle2, 
-  FileSpreadsheet, 
+  Sparkles, 
+  Database,
   ArrowRight,
   RefreshCw,
   Info
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { 
   getMembers, 
   addMember, 
   deleteMember, 
-  distributeDataset, 
+  distributeDefaultDataset, 
   getMonitoringStats, 
   exportManualCsv 
 } from '../services/storage';
 
 export default function AdminView() {
-  const [subTab, setSubTab] = useState('monitoring'); // 'members', 'import', 'monitoring'
+  const [subTab, setSubTab] = useState('monitoring'); // 'monitoring', 'distribute', 'members'
 
   // Members State
   const [members, setMembers] = useState([]);
@@ -31,12 +31,7 @@ export default function AdminView() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberError, setMemberError] = useState(null);
 
-  // CSV Import & Distribution State
-  const [csvFile, setCsvFile] = useState(null);
-  const [parsedRows, setParsedRows] = useState([]);
-  const [csvColumns, setCsvColumns] = useState([]);
-  const [selectedRecordIdCol, setSelectedRecordIdCol] = useState('');
-  const [selectedTextCol, setSelectedTextCol] = useState('');
+  // Distribution State
   const [distributing, setDistributing] = useState(false);
   const [distributionResult, setDistributionResult] = useState(null);
 
@@ -100,63 +95,20 @@ export default function AdminView() {
     }
   };
 
-  // Handle File Upload & Parse
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setCsvFile(file);
-    setDistributionResult(null);
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.replace(/^\ufeff/, '').trim(), // Clean BOM \ufeff
-      complete: (results) => {
-        if (results.data && results.data.length > 0) {
-          setParsedRows(results.data);
-          const cols = Object.keys(results.data[0]);
-          setCsvColumns(cols);
-
-          const idCandidate = cols.find(c => /^(id|record_id|no|kode)$/i.test(c)) || cols[0];
-          const textCandidate = cols.find(c => /^(text|teks|tweet|clean_text|text_clean)$/i.test(c)) || cols[1] || cols[0];
-
-          setSelectedRecordIdCol(idCandidate || '');
-          setSelectedTextCol(textCandidate || '');
-        }
-      },
-      error: (err) => {
-        alert('Gagal membaca file CSV: ' + err.message);
-      }
-    });
-  };
-
-  // Handle Distribute
-  const handleDistribute = async () => {
-    if (parsedRows.length === 0) {
-      alert('Unggah file CSV terlebih dahulu.');
-      return;
-    }
-    if (!selectedTextCol) {
-      alert('Pilih kolom teks.');
-      return;
-    }
+  // Handle 1-Click Distribution with Embedded Dataset
+  const handleDistributeDefault = async () => {
     if (members.length === 0) {
-      alert('Belum ada anggota yang terdaftar untuk menerima data.');
+      alert('Belum ada anggota terdaftar. Daftarkan nama anggota terlebih dahulu di tab "Manajemen Anggota".');
       return;
     }
 
-    if (!window.confirm(`Distribusikan ${parsedRows.length} data ke ${members.length} anggota secara merata?`)) {
+    if (!window.confirm(`Distribusikan 1.921 data opini ke ${members.length} anggota kelompok secara merata?`)) {
       return;
     }
 
     try {
       setDistributing(true);
-      const res = await distributeDataset(
-        parsedRows, 
-        selectedRecordIdCol || csvColumns[0], 
-        selectedTextCol, 
-        members
-      );
+      const res = await distributeDefaultDataset(members);
       setDistributionResult(res);
       await loadStatsData();
     } catch (err) {
@@ -183,15 +135,15 @@ export default function AdminView() {
         </button>
 
         <button
-          onClick={() => setSubTab('import')}
+          onClick={() => setSubTab('distribute')}
           className={`pb-3 text-sm font-semibold flex items-center space-x-2 border-b-2 transition ${
-            subTab === 'import'
+            subTab === 'distribute'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
-          <Upload className="w-4 h-4" />
-          <span>Import Dataset & Distribusi</span>
+          <Database className="w-4 h-4" />
+          <span>Distribusi Dataset (1.921 Data)</span>
         </button>
 
         <button
@@ -219,7 +171,7 @@ export default function AdminView() {
               <div className="text-2xl font-extrabold text-slate-900 mt-1">
                 {statsLoading ? '...' : (stats?.total || 0).toLocaleString()}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Seluruh record ditugaskan</p>
+              <p className="text-[11px] text-slate-400 mt-1">Target data: 1.921 record</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -243,7 +195,7 @@ export default function AdminView() {
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
                 <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Aksi Admin</span>
-                <p className="text-xs text-slate-500 mt-1">Unduh hasil anotasi anggota</p>
+                <p className="text-xs text-slate-500 mt-1">Unduh hasil anotasi manual</p>
               </div>
               <button
                 onClick={exportManualCsv}
@@ -261,7 +213,7 @@ export default function AdminView() {
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Progress Pelabelan Tiap Anggota</h3>
-                <p className="text-xs text-slate-500">Monitor kemajuan pelabelan masing-masing anggota secara transparan</p>
+                <p className="text-xs text-slate-500">Monitor kemajuan pelabelan masing-masing anggota secara realtime</p>
               </div>
               <button
                 onClick={loadStatsData}
@@ -302,7 +254,7 @@ export default function AdminView() {
                         <td className="py-3.5 px-5 font-bold text-slate-900">
                           {mp.name}
                         </td>
-                        <td className="py-3.5 px-5 text-slate-700">{mp.total}</td>
+                        <td className="py-3.5 px-5 text-slate-700 font-semibold">{mp.total}</td>
                         <td className="py-3.5 px-5 font-semibold text-emerald-600">{mp.done}</td>
                         <td className="py-3.5 px-5 text-slate-500">{mp.remaining}</td>
                         <td className="py-3.5 px-5 min-w-[180px]">
@@ -344,147 +296,82 @@ export default function AdminView() {
       )}
 
       {/* ==================================================================== */}
-      {/* SUB-TAB 2: IMPORT DATASET & DISTRIBUSI */}
+      {/* SUB-TAB 2: DISTRIBUSI DATASET (AUTOMATED 1-CLICK) */}
       {/* ==================================================================== */}
-      {subTab === 'import' && (
+      {subTab === 'distribute' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-base mb-1">Unggah Dataset CSV</h3>
-            <p className="text-xs text-slate-500 mb-6">
-              Pilih file CSV dataset opini (seperti <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">hasil_prediksi_NPM_221_279.csv</code>)
-            </p>
-
-            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:border-blue-400 transition bg-slate-50/50">
-              <FileSpreadsheet className="w-12 h-12 mx-auto text-slate-400 mb-3" />
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="csv-file-input"
-              />
-              <label
-                htmlFor="csv-file-input"
-                className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs cursor-pointer shadow-sm transition"
-              >
-                Pilih File CSV dari Komputer
-              </label>
-              {csvFile && (
-                <p className="text-xs font-semibold text-slate-700 mt-3 font-mono">
-                  File terpilih: {csvFile.name} ({(csvFile.size / 1024 / 1024).toFixed(2)} MB, {parsedRows.length} baris)
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg">Dataset Terintegrasi Bawaan (1.921 Data)</h3>
+                <p className="text-xs text-slate-500">
+                  Dataset <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold">hasil_prediksi_NPM_221_279.csv</code> sudah tertanam langsung dalam kode.
                 </p>
-              )}
+              </div>
             </div>
 
-            {/* Column Mapping & Preview */}
-            {parsedRows.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-100 space-y-6">
-                <h4 className="font-bold text-sm text-slate-900">Pemetaan Kolom & Verifikasi ID</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Kolom ID Unik (record_id):
-                    </label>
-                    <select
-                      value={selectedRecordIdCol}
-                      onChange={(e) => setSelectedRecordIdCol(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {csvColumns.map(col => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400">
-                      *Digunakan untuk mencocokkan hasil manual dengan prediksi LLM.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Kolom Teks yang Akan Dilabeli:
-                    </label>
-                    <select
-                      value={selectedTextCol}
-                      onChange={(e) => setSelectedTextCol(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {csvColumns.map(col => (
-                        <option key={col} value={col}>{col}</option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-slate-400">
-                      *Teks yang akan dibaca dan dinilai oleh anggota kelompok.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Preview Table */}
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/80 mb-6 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-2">
-                    Preview Data (3 Baris Pertama):
-                  </label>
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-100 text-slate-700 font-semibold">
-                        <tr>
-                          <th className="py-2 px-3">Record ID ({selectedRecordIdCol})</th>
-                          <th className="py-2 px-3">Teks ({selectedTextCol})</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {parsedRows.slice(0, 3).map((r, i) => (
-                          <tr key={i}>
-                            <td className="py-2 px-3 font-mono text-slate-600 whitespace-nowrap">
-                              {r[selectedRecordIdCol]}
-                            </td>
-                            <td className="py-2 px-3 text-slate-800 max-w-md truncate">
-                              {r[selectedTextCol]}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <span className="text-slate-400 font-medium">Total Data:</span>
+                  <p className="font-bold text-slate-900 font-mono text-base">1.921 Record</p>
                 </div>
-
-                {/* Distribution Button */}
-                <div className="pt-4 flex items-center justify-between">
-                  <div className="text-xs text-slate-500">
-                    Data akan dibagi merata ke <strong>{members.length} anggota</strong> terdaftar.
-                  </div>
-                  <button
-                    onClick={handleDistribute}
-                    disabled={distributing || members.length === 0}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold text-xs flex items-center space-x-2 transition shadow-sm"
-                  >
-                    {distributing ? (
-                      <span>Mendistribusikan data...</span>
-                    ) : (
-                      <>
-                        <span>Distribusikan {parsedRows.length} Data ke {members.length} Anggota</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
+                <div>
+                  <span className="text-slate-400 font-medium">Prediksi LLM:</span>
+                  <p className="font-bold text-emerald-700 text-base">Otomatis Termasuk</p>
                 </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Jumlah Anggota:</span>
+                  <p className="font-bold text-slate-900 font-mono text-base">{members.length} Orang</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Rata-rata Tugas:</span>
+                  <p className="font-bold text-blue-700 font-mono text-base">
+                    {members.length > 0 ? `~${Math.round(1921 / members.length)} data/orang` : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-                {/* Distribution Success Feedback */}
-                {distributionResult && (
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs space-y-2">
-                    <div className="font-bold flex items-center space-x-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Distribusi Berhasil! Total {distributionResult.totalDistributed} data telah dibagikan:</span>
-                    </div>
-                    <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                      {distributionResult.distributionSummary.map(ds => (
-                        <li key={ds.name} className="bg-white/80 p-1.5 rounded border border-emerald-200">
-                          {ds.name}: <strong>{ds.count} data</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+              <p className="text-xs text-slate-500">
+                Klik tombol di samping untuk membagi rata 1.921 data ke semua anggota sekaligus menyiapkan data LLM.
+              </p>
+
+              <button
+                onClick={handleDistributeDefault}
+                disabled={distributing || members.length === 0}
+                className="px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20 transition whitespace-nowrap"
+              >
+                {distributing ? (
+                  <span>Membagi 1.921 data ke Supabase...</span>
+                ) : (
+                  <>
+                    <span>Distribusikan 1.921 Data ke {members.length} Anggota</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
                 )}
+              </button>
+            </div>
+
+            {/* Distribution Success Feedback */}
+            {distributionResult && (
+              <div className="mt-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs space-y-3">
+                <div className="font-bold text-sm flex items-center space-x-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Distribusi Berhasil! Total {distributionResult.totalDistributed} data telah dibagikan:</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                  {distributionResult.distributionSummary.map(ds => (
+                    <div key={ds.name} className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                      <p className="font-bold text-slate-900">{ds.name}</p>
+                      <p className="text-emerald-700 font-mono font-bold mt-0.5">{ds.count} data</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

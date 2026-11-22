@@ -1,10 +1,76 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import Papa from 'papaparse';
+import { DEFAULT_DATASET } from '../data/defaultDataset';
 
 function ensureSupabase() {
   if (!supabase || !isSupabaseConfigured) {
     throw new Error('Database Supabase belum terhubung. Pastikan VITE_SUPABASE_ANON_KEY sudah diisi.');
   }
+}
+
+// Helper to fetch ALL rows beyond Supabase's default 1000-row limit
+async function fetchAllAssignments(filterName = null) {
+  ensureSupabase();
+  const pageSize = 1000;
+  let allData = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase
+      .from('assignments')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (filterName) {
+      query = query.eq('member_name', filterName);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData = allData.concat(data);
+      from += pageSize;
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+}
+
+async function fetchAllLlmResults() {
+  ensureSupabase();
+  const pageSize = 1000;
+  let allData = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('llm_results')
+      .select('*')
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData = allData.concat(data);
+      from += pageSize;
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
 }
 
 // ============================================================================
@@ -48,34 +114,27 @@ export async function deleteMember(id) {
 }
 
 // ============================================================================
-// ASSIGNMENTS & DATA DISTRIBUTION
+// ASSIGNMENTS & DATA DISTRIBUTION (AUTOMATED EMBEDDED DATASET)
 // ============================================================================
 export async function getAssignments(filterName = null) {
-  ensureSupabase();
-  let query = supabase.from('assignments').select('*').order('created_at', { ascending: true });
-  if (filterName) {
-    query = query.eq('member_name', filterName);
-  }
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  return await fetchAllAssignments(filterName);
 }
 
-export async function distributeDataset(rawRows, recordIdCol, textCol, membersList) {
+// Automated 1-Click Distribution of the 1,921 Embedded Dataset
+export async function distributeDefaultDataset(membersList) {
   ensureSupabase();
   if (!membersList || membersList.length === 0) {
-    throw new Error('Tidak ada anggota yang terdaftar untuk menerima distribusi data.');
-  }
-  if (!rawRows || rawRows.length === 0) {
-    throw new Error('Dataset CSV kosong.');
+    throw new Error('Tidak ada anggota terdaftar. Daftarkan nama anggota terlebih dahulu.');
   }
 
+  const rawRows = DEFAULT_DATASET;
   const numMembers = membersList.length;
-  const totalRows = rawRows.length;
+  const totalRows = rawRows.length; // 1921
   const baseCount = Math.floor(totalRows / numMembers);
   const remainder = totalRows % numMembers;
 
   const assignmentsToInsert = [];
+  const llmResultsToInsert = [];
   let currentIndex = 0;
 
   for (let m = 0; m < numMembers; m++) {
@@ -86,43 +145,41 @@ export async function distributeDataset(rawRows, recordIdCol, textCol, membersLi
       if (currentIndex >= totalRows) break;
       const row = rawRows[currentIndex];
       
-      let recordId = row[recordIdCol];
-      if (recordId === undefined || recordId === null || String(recordId).trim() === '') {
-        recordId = `rec_${currentIndex + 1}`;
-      } else {
-        recordId = String(recordId).trim();
-      }
-
-      const textVal = row[textCol] !== undefined && row[textCol] !== null 
-        ? String(row[textCol]).trim() 
-        : '';
-
       assignmentsToInsert.push({
-        record_id: recordId,
+        record_id: row.record_id,
         member_id: member.id,
         member_name: member.name,
-        text: textVal,
+        text: row.text,
         manual_label: null,
         labeled_at: null,
+      });
+
+      llmResultsToInsert.push({
+        record_id: row.record_id,
+        llm_label: row.llm_label,
       });
 
       currentIndex++;
     }
   }
 
-  // Clear old assignments first
-  const { error: delError } = await supabase
-    .from('assignments')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000');
-  if (delError) console.warn('Note deleting assignments:', delError);
+  // 1. Clear previous assignments and LLM results
+  await supabase.from('assignments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('llm_results').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-  // Insert in batches of 300 to avoid payload limits
+  // 2. Batch insert assignments (batches of 300)
   const batchSize = 300;
   for (let i = 0; i < assignmentsToInsert.length; i += batchSize) {
     const batch = assignmentsToInsert.slice(i, i + batchSize);
-    const { error: insError } = await supabase.from('assignments').insert(batch);
-    if (insError) throw insError;
+    const { error: insErr } = await supabase.from('assignments').insert(batch);
+    if (insErr) throw insErr;
+  }
+
+  // 3. Batch insert LLM results (batches of 300)
+  for (let i = 0; i < llmResultsToInsert.length; i += batchSize) {
+    const batch = llmResultsToInsert.slice(i, i + batchSize);
+    const { error: llmErr } = await supabase.from('llm_results').insert(batch);
+    if (llmErr) throw llmErr;
   }
 
   return {
@@ -157,7 +214,7 @@ export async function updateManualLabel(recordId, label) {
 export async function getMonitoringStats() {
   ensureSupabase();
   const members = await getMembers();
-  const assignments = await getAssignments();
+  const assignments = await fetchAllAssignments();
 
   const total = assignments.length;
   const labeled = assignments.filter(a => a.manual_label !== null && a.manual_label !== '').length;
@@ -190,7 +247,7 @@ export async function getMonitoringStats() {
 
 export async function exportManualCsv() {
   ensureSupabase();
-  const assignments = await getAssignments();
+  const assignments = await fetchAllAssignments();
   const rows = assignments.map(a => ({
     record_id: a.record_id,
     text: a.text,
@@ -208,7 +265,7 @@ export async function exportManualCsv() {
 // ============================================================================
 export async function importLlmResults(rawRows, recordIdCol, labelCol) {
   ensureSupabase();
-  const assignments = await getAssignments();
+  const assignments = await fetchAllAssignments();
   const existingRecordIds = new Set(assignments.map(a => String(a.record_id).trim()));
 
   const validLlmResults = [];
@@ -249,12 +306,7 @@ export async function importLlmResults(rawRows, recordIdCol, labelCol) {
     });
   }
 
-  // Clear old LLM results and insert
-  const { error: delError } = await supabase
-    .from('llm_results')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000');
-  if (delError) console.warn('Note deleting old LLM results:', delError);
+  await supabase.from('llm_results').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
   const batchSize = 300;
   for (let i = 0; i < validLlmResults.length; i += batchSize) {
@@ -273,12 +325,11 @@ export async function importLlmResults(rawRows, recordIdCol, labelCol) {
 
 export async function getComparisonData() {
   ensureSupabase();
-  const assignments = await getAssignments();
-  const { data: llmResults, error } = await supabase.from('llm_results').select('*');
-  if (error) throw error;
+  const assignments = await fetchAllAssignments();
+  const llmResults = await fetchAllLlmResults();
 
   const llmMap = new Map();
-  for (const item of (llmResults || [])) {
+  for (const item of llmResults) {
     llmMap.set(String(item.record_id).trim(), item.llm_label);
   }
 
